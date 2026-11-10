@@ -4,6 +4,7 @@ import cors from "cors";
 import { config } from "./config";
 import { healthRouter } from "./routes/health";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { authRouter } from "./routes/auth";
 
 export function createApp() {
   const app = express();
@@ -13,7 +14,7 @@ export function createApp() {
   app.use(express.json({ limit: "100kb" }));
 
   app.use("/health", healthRouter);
-  // later: /auth, /users, /issues, /evidence, /dashboard, /pending-actions
+  app.use("/auth", authRouter); 
 
   app.use(notFoundHandler);
   app.use(errorHandler); // must be last
