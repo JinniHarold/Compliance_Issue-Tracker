@@ -6,7 +6,8 @@
   "engines": { "node": ">=20" },
   "scripts": {
     "db:setup": "tsx src/db/setup.ts",
-    "db:reset": "tsx src/db/setup.ts --reset"
+    "db:reset": "tsx src/db/setup.ts --reset",
+    "db:inspect": "tsx src/db/inspect.ts"
   },
   "keywords": [],
   "author": "",
