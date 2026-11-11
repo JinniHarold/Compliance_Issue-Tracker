@@ -5,6 +5,7 @@ import { config } from "./config";
 import { healthRouter } from "./routes/health";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { authRouter } from "./routes/auth";
+import { usersRouter } from "./routes/users";
 
 export function createApp() {
   const app = express();
@@ -15,6 +16,8 @@ export function createApp() {
 
   app.use("/health", healthRouter);
   app.use("/auth", authRouter); 
+  app.use("/auth", authRouter);
+  app.use("/users", usersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler); // must be last
