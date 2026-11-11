@@ -2,7 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { authenticate } from "../middleware/auth";
 import { requirePermission } from "../middleware/permissions";
-import { changeStatus, createIssue, getIssue, listIssues, updateIssue } from "../services/issues";
+import { applyAction, createIssue, getIssue, listIssues, updateIssue, type Action } from "../services/issues";
+import { addComment, listComments } from "../services/comments";
 
 export const issuesRouter = Router();
 issuesRouter.use(authenticate);
@@ -17,6 +18,7 @@ const dateString = z
     const d = new Date(s);
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
   }, "Not a real calendar date");
+
 const idParams = z.object({ id: z.string().uuid() });
 
 const listQuery = z.object({
@@ -51,7 +53,8 @@ const patchSchema = z
   .strict()
   .refine((o) => Object.keys(o).length > 0, "Provide at least one field to change");
 
-const statusSchema = z.object({ status });
+const noteSchema = z.object({ comment: z.string().trim().max(2000).optional() });
+const commentSchema = z.object({ body: z.string().trim().min(1).max(2000) });
 
 issuesRouter.get("/", requirePermission("issues:read"), (req, res, next) => {
   try {
@@ -89,11 +92,41 @@ issuesRouter.patch("/:id", requirePermission("issues:update"), (req, res, next) 
   }
 });
 
-issuesRouter.post("/:id/status", requirePermission("issues:update"), (req, res, next) => {
+// One endpoint per workflow action: each maps to one button and one audit entry
+const ACTION_ROUTES: [string, Action][] = [
+  ["start", "start"],
+  ["request-review", "request_review"],
+  ["request-revision", "request_revision"],
+  ["complete", "complete"],
+  ["reopen", "reopen"],
+];
+
+for (const [path, action] of ACTION_ROUTES) {
+  issuesRouter.post(`/:id/${path}`, requirePermission("issues:update"), (req, res, next) => {
+    try {
+      const { id } = idParams.parse(req.params);
+      const { comment } = noteSchema.parse(req.body ?? {});
+      res.json({ issue: applyAction(req.user!, id, action, comment) });
+    } catch (err) {
+      next(err);
+    }
+  });
+}
+
+issuesRouter.get("/:id/comments", requirePermission("issues:read"), (req, res, next) => {
   try {
     const { id } = idParams.parse(req.params);
-    const { status: to } = statusSchema.parse(req.body ?? {});
-    res.json({ issue: changeStatus(req.user!, id, to) });
+    res.json({ comments: listComments(id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+issuesRouter.post("/:id/comments", requirePermission("comments:add"), (req, res, next) => {
+  try {
+    const { id } = idParams.parse(req.params);
+    const { body } = commentSchema.parse(req.body ?? {});
+    res.status(201).json({ comment: addComment(req.user!, id, body) });
   } catch (err) {
     next(err);
   }

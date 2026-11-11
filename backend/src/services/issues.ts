@@ -3,16 +3,10 @@ import { db } from "../db/connection";
 import type { AuthUser } from "../middleware/auth";
 import { badRequest, conflict, forbidden, notFound } from "../utils/errors";
 import { recordAudit } from "./audit";
+import { insertComment, type CommentKind } from "./comments";
 
 export type Severity = "low" | "medium" | "high" | "critical";
 export type Status = "open" | "in_progress" | "in_review" | "completed";
-
-const TRANSITIONS: Record<Status, readonly Status[]> = {
-  open: ["in_progress"],
-  in_progress: ["open", "in_review"],
-  in_review: ["in_progress", "completed"],
-  completed: ["in_progress"],
-};
 
 interface IssueRow {
   id: string;
@@ -159,6 +153,9 @@ export function updateIssue(actor: AuthUser, id: string, patch: Patch): Issue {
     if (Object.keys(patch).some((k) => k !== "description")) {
       throw forbidden("Only an admin can change these fields");
     }
+    if (current.status === "in_review" || current.status === "completed") {
+      throw conflict("This issue is locked while it is under review or completed");
+    }
   }
   if (patch.owner_id) assertAssignableOwner(patch.owner_id);
 
@@ -187,21 +184,40 @@ export function updateIssue(actor: AuthUser, id: string, patch: Patch): Issue {
   return getIssue(id);
 }
 
-// Also used later when a human approves a pending action: the approver is the actor
-export function changeStatus(actor: AuthUser, id: string, to: Status): Issue {
-  const issue = getIssue(id);
+export type Action = "start" | "request_review" | "request_revision" | "complete" | "reopen";
 
-  if (actor.role !== "admin" && issue.owner_id !== actor.id) {
+const ACTIONS: Record<
+  Action,
+  { from: Status; to: Status; adminOnly: boolean; commentRequired: boolean; kind: CommentKind | null }
+> = {
+  start:            { from: "open",        to: "in_progress", adminOnly: false, commentRequired: false, kind: null },
+  request_review:   { from: "in_progress", to: "in_review",   adminOnly: false, commentRequired: false, kind: "review_requested" },
+  request_revision: { from: "in_review",   to: "in_progress", adminOnly: true,  commentRequired: true,  kind: "revision_requested" },
+  complete:         { from: "in_review",   to: "completed",   adminOnly: true,  commentRequired: false, kind: "approved" },
+  reopen:           { from: "completed",   to: "in_progress", adminOnly: true,  commentRequired: true,  kind: "reopened" },
+};
+
+// Also used later when a human approves a pending action: the approver is the actor
+export function applyAction(actor: AuthUser, id: string, action: Action, note?: string): Issue {
+  const rule = ACTIONS[action];
+  const issue = getIssue(id);
+  const isOwner = issue.owner_id === actor.id;
+  const body = (note ?? "").trim();
+
+  if (rule.adminOnly) {
+    if (actor.role !== "admin") throw forbidden("Only an admin can do this");
+    if (isOwner) throw forbidden("You cannot review an issue you own");
+  } else if (actor.role !== "admin" && !isOwner) {
     throw forbidden("You can only change the status of issues you own");
   }
-  if (to === issue.status) throw badRequest(`Issue is already ${to}`);
-  if (!TRANSITIONS[issue.status].includes(to)) {
-    throw conflict(`Cannot move an issue from ${issue.status} to ${to}`);
+
+  if (issue.status !== rule.from) {
+    throw conflict(`This action needs the issue to be ${rule.from}, but it is ${issue.status}`);
   }
-  if (issue.status === "completed" && actor.role !== "admin") {
-    throw forbidden("Only an admin can reopen a completed issue");
+  if (rule.commentRequired && body.length === 0) {
+    throw badRequest("A comment is required for this action");
   }
-  if (to === "completed" && issue.evidence_count === 0) {
+  if (action === "complete" && issue.evidence_count === 0) {
     throw conflict("Add at least one piece of evidence before completing this issue");
   }
 
@@ -211,8 +227,14 @@ export function changeStatus(actor: AuthUser, id: string, to: Status): Issue {
        SET status = ?, updated_at = CURRENT_TIMESTAMP,
            completed_at = CASE WHEN ? = 'completed' THEN CURRENT_TIMESTAMP ELSE NULL END
        WHERE id = ?`
-    ).run(to, to, id);
-    recordAudit(actor, "issue.status_changed", "issue", id, { from: issue.status, to });
+    ).run(rule.to, rule.to, id);
+
+    const commentId = rule.kind ? insertComment(id, actor.id, rule.kind, body) : null;
+    recordAudit(actor, `issue.${action}`, "issue", id, {
+      from: issue.status,
+      to: rule.to,
+      ...(commentId ? { comment_id: commentId } : {}),
+    });
   })();
 
   return getIssue(id);

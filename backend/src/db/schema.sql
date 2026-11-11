@@ -71,6 +71,19 @@ CREATE INDEX IF NOT EXISTS idx_evidence_issue  ON evidence(issue_id);
 CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_pending_status  ON pending_actions(status);
 
+CREATE TABLE IF NOT EXISTS issue_comments (
+  id         TEXT PRIMARY KEY,
+  issue_id   TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+  author_id  TEXT NOT NULL REFERENCES users(id),
+  kind       TEXT NOT NULL DEFAULT 'comment'
+             CHECK (kind IN ('comment','review_requested','revision_requested','approved','reopened')),
+  body       TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK (kind NOT IN ('comment','revision_requested','reopened') OR length(trim(body)) > 0)
+);
+
+CREATE INDEX IF NOT EXISTS idx_comments_issue ON issue_comments(issue_id, created_at);
+
 CREATE TRIGGER IF NOT EXISTS audit_no_update
 BEFORE UPDATE ON audit_logs
 BEGIN SELECT RAISE(ABORT, 'audit_logs is append-only'); END;

@@ -8,6 +8,7 @@ export type Permission =
   | "issues:read"
   | "issues:create"
   | "issues:update"
+  | "comments:add"
   | "evidence:add"
   | "pending:propose"
   | "pending:decide"
@@ -16,13 +17,19 @@ export type Permission =
 
 const PERMISSIONS: Record<Role, readonly Permission[]> = {
   admin: [
-    "dashboard:read", "issues:read", "issues:create", "issues:update",
+    "dashboard:read", "issues:read", "issues:create", "issues:update", "comments:add",
     "evidence:add", "pending:propose", "pending:decide", "audit:read", "users:manage",
   ],
-  owner: ["dashboard:read", "issues:read", "issues:update", "evidence:add", "pending:propose"],
+  owner: [
+    "dashboard:read", "issues:read", "issues:update", "comments:add",
+    "evidence:add", "pending:propose",
+  ],
   auditor: ["dashboard:read", "issues:read", "audit:read"],
-  // The agent can read, add notes/evidence links, and PROPOSE. It can never decide.
-  agent: ["dashboard:read", "issues:read", "evidence:add", "pending:propose", "audit:read"],
+  // The agent can read, comment, add evidence links, and PROPOSE. It can never decide.
+  agent: [
+    "dashboard:read", "issues:read", "comments:add",
+    "evidence:add", "pending:propose", "audit:read",
+  ],
 };
 
 export function can(role: Role, permission: Permission): boolean {
