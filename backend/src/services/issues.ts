@@ -186,7 +186,7 @@ export function updateIssue(actor: AuthUser, id: string, patch: Patch): Issue {
 
 export type Action = "start" | "request_review" | "request_revision" | "complete" | "reopen";
 
-const ACTIONS: Record<
+export const ACTIONS: Record<
   Action,
   { from: Status; to: Status; adminOnly: boolean; commentRequired: boolean; kind: CommentKind | null }
 > = {

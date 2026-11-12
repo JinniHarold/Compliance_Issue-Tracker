@@ -50,16 +50,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE TABLE IF NOT EXISTS pending_actions (
   id            TEXT PRIMARY KEY,
   issue_id      TEXT NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
-  action_type   TEXT NOT NULL CHECK (action_type IN ('update_status','update_severity')),
-  payload       TEXT NOT NULL,
-  rationale     TEXT NOT NULL DEFAULT '',
+  action_type   TEXT NOT NULL CHECK (action_type IN
+                ('start','request_review','request_revision','complete','reopen','update_severity')),
+  payload       TEXT NOT NULL DEFAULT '{}',
+  rationale     TEXT NOT NULL,
   requested_by  TEXT NOT NULL REFERENCES users(id),
-  status        TEXT NOT NULL DEFAULT 'pending'
-                CHECK (status IN ('pending','approved','rejected')),
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
   decided_by    TEXT REFERENCES users(id),
   decided_at    TEXT,
   decision_note TEXT,
-  created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK ((status = 'pending' AND decided_by IS NULL) OR (status != 'pending' AND decided_by IS NOT NULL)),
+  CHECK (decided_by IS NULL OR decided_by != requested_by)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_token
@@ -83,6 +85,7 @@ CREATE TABLE IF NOT EXISTS issue_comments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_issue ON issue_comments(issue_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_unique ON pending_actions(issue_id, action_type) WHERE status = 'pending';
 
 CREATE TRIGGER IF NOT EXISTS audit_no_update
 BEFORE UPDATE ON audit_logs

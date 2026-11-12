@@ -10,6 +10,7 @@ import { issuesRouter } from "./routes/issues";
 import { evidenceRouter } from "./routes/evidence";
 import { auditRouter } from "./routes/audit";
 import { dashboardRouter } from "./routes/dashboard";
+import { pendingActionsRouter } from "./routes/pendingActions";
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp() {
   app.use("/issues/:id/evidence", evidenceRouter);
   app.use("/audit", auditRouter);
   app.use("/dashboard", dashboardRouter);
+  app.use("/pending-actions", pendingActionsRouter);
   
   app.use(notFoundHandler);
   app.use(errorHandler); // must be last
