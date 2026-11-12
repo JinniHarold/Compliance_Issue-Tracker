@@ -4,21 +4,13 @@ import { authenticate } from "../middleware/auth";
 import { requirePermission } from "../middleware/permissions";
 import { applyAction, createIssue, getIssue, listIssues, updateIssue, type Action } from "../services/issues";
 import { addComment, listComments } from "../services/comments";
+import { dateString } from "../utils/validation";
 
 export const issuesRouter = Router();
 issuesRouter.use(authenticate);
 
 const severity = z.enum(["low", "medium", "high", "critical"]);
 const status = z.enum(["open", "in_progress", "in_review", "completed"]);
-
-const dateString = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
-  .refine((s) => {
-    const d = new Date(s);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, "Not a real calendar date");
-
 const idParams = z.object({ id: z.string().uuid() });
 
 const listQuery = z.object({

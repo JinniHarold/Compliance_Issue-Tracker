@@ -8,6 +8,8 @@ import { authRouter } from "./routes/auth";
 import { usersRouter } from "./routes/users";
 import { issuesRouter } from "./routes/issues";
 import { evidenceRouter } from "./routes/evidence";
+import { auditRouter } from "./routes/audit";
+import { dashboardRouter } from "./routes/dashboard";
 
 export function createApp() {
   const app = express();
@@ -21,7 +23,9 @@ export function createApp() {
   app.use("/users", usersRouter);
   app.use("/issues", issuesRouter);
   app.use("/issues/:id/evidence", evidenceRouter);
-
+  app.use("/audit", auditRouter);
+  app.use("/dashboard", dashboardRouter);
+  
   app.use(notFoundHandler);
   app.use(errorHandler); // must be last
 
