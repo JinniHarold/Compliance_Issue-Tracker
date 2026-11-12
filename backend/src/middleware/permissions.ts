@@ -28,7 +28,7 @@ const PERMISSIONS: Record<Role, readonly Permission[]> = {
   // The agent can read, comment, add evidence links, and PROPOSE. It can never decide.
   agent: [
     "dashboard:read", "issues:read", "comments:add",
-    "evidence:add", "pending:propose", "audit:read",
+    "pending:propose", "audit:read",
   ],
 };
 
