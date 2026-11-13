@@ -56,3 +56,16 @@ Statuses: open, in_progress, in_review, completed.
 
 ## Done means
 `npm run build` passes with no TypeScript errors, and the screen was checked in the browser as admin, owner, and auditor.
+
+## Skeleton phase (current)
+Goal: a working, minimally styled skeleton. Every API capability must be reachable from the UI. Styling and animation come later, so do not add colors, animations, icons, or libraries.
+
+- All styling lives in `src/components/ui.tsx` (primitives: Button, TextInput, Textarea, Select, Field, Card, Alert, Spinner, EmptyState, Table wrappers, Dialog, Pagination, Tabs) plus `Badges.tsx`. Pages use these primitives and only layout classes (flex, grid, gap, spacing). No long class strings inside pages, so a restyle means editing ui.tsx.
+- Dialogs use the native `<dialog>` element with `showModal()`.
+- Data loading uses one small hook, `src/lib/useFetch.ts`, returning `{ data, error, loading, reload }`. Always handle loading, empty, and error states.
+- Forms: controlled inputs, visible labels, disabled button while submitting, an Alert for the error message, and field-level messages mapped from `ApiError.details[].path`.
+- List filters and paging live in the URL query string (`useSearchParams`) so links from the dashboard work and refresh keeps state.
+- Do not modify `src/lib/api.ts`, `src/auth/AuthContext.tsx`, `ProtectedRoute`, `RoleRoute`, or anything in `backend/`.
+- Add new response types to `src/lib/types.ts`, matching `api-contract.md` exactly.
+- Role checks: `can()` from `src/lib/permissions.ts` for role-wide rules, plus inline checks like `user.id === issue.owner_id` for per-record rules. Hiding is cosmetic; the API enforces.
+- End every task with: the list of files changed, and 5 manual test steps. `npm run build` must pass.
