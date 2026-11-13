@@ -14,6 +14,38 @@ export interface UserRecord extends User {
   created_at: string;
 }
 
+export type UserRow = UserRecord;
+
+export interface PendingAction {
+  id: string;
+  issue_id: string;
+  issue_title: string;
+  action_type: "start" | "request_review" | "request_revision" | "complete" | "reopen" | "update_severity";
+  payload: { comment?: string; severity?: Severity };
+  rationale: string;
+  requested_by: string;
+  requested_by_name: string;
+  status: "pending" | "approved" | "rejected";
+  decided_by: string | null;
+  decided_by_name: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  created_at: string;
+  actor_id: string;
+  actor_email: string;
+  actor_name: string;
+  actor_type: "human" | "agent";
+  action: string;
+  entity_type: "issue" | "user";
+  entity_id: string;
+  details: Record<string, unknown>;
+}
+
 export interface Issue {
   id: string;
   title: string;

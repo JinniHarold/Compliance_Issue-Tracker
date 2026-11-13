@@ -9,6 +9,7 @@ interface CommentsSectionProps {
   issueId: string;
   ownerId: string;
   user: User;
+  onCommentAdded: () => void;
 }
 
 const KIND_LABELS: Record<IssueComment["kind"], string> = {
@@ -19,7 +20,7 @@ const KIND_LABELS: Record<IssueComment["kind"], string> = {
   reopened: "Reopened",
 };
 
-export default function CommentsSection({ issueId, ownerId, user }: CommentsSectionProps) {
+export default function CommentsSection({ issueId, ownerId, user, onCommentAdded }: CommentsSectionProps) {
   const path = `/issues/${encodeURIComponent(issueId)}/comments`;
   const { data, error, loading, reload } = useFetch<{ comments: IssueComment[] }>(path);
   const canComment = user.role === "admin" || (user.role === "owner" && user.id === ownerId);
@@ -35,6 +36,7 @@ export default function CommentsSection({ issueId, ownerId, user }: CommentsSect
       await api<{ comment: IssueComment }>(path, { method: "POST", body: { body } });
       setBody("");
       reload();
+      onCommentAdded();
     } catch (reason: unknown) {
       setSubmitError(reason instanceof Error ? reason.message : "Could not add comment.");
     } finally {

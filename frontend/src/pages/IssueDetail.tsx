@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
-import { Alert, Card, Heading, Spinner, TextContent } from "../components/ui";
+import { Alert, Card, EmptyState, Heading, Spinner, TextContent } from "../components/ui";
 import CommentsSection from "../components/issue/CommentsSection";
 import EditDetails from "../components/issue/EditDetails";
 import EvidenceSection from "../components/issue/EvidenceSection";
@@ -9,7 +9,8 @@ import WorkflowActions from "../components/issue/WorkflowActions";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
 import { formatDate, formatDateTime } from "../lib/format";
-import type { Issue } from "../lib/types";
+import { can } from "../lib/permissions";
+import type { AuditEntry, Issue, Paged } from "../lib/types";
 import { useFetch } from "../lib/useFetch";
 
 export default function IssueDetail() {
@@ -17,6 +18,11 @@ export default function IssueDetail() {
   const { id = "" } = useParams();
   const encodedId = encodeURIComponent(id);
   const issueResult = useFetch<{ issue: Issue }>(`/issues/${encodedId}`);
+  const historyResult = useFetch<Paged<AuditEntry, "entries">>(
+    user && can(user.role, "audit:read")
+      ? `/audit?entity_type=issue&entity_id=${encodeURIComponent(id)}&limit=50`
+      : null
+  );
   const [updatedIssue, setUpdatedIssue] = useState<{ id: string; issue: Issue } | null>(null);
   const [activityRevision, setActivityRevision] = useState(0);
 
@@ -43,7 +49,10 @@ export default function IssueDetail() {
   if (!issueResult.data || !user) return null;
 
   const issue = updatedIssue?.id === id ? updatedIssue.issue : issueResult.data.issue;
-  const handleIssueUpdated = (nextIssue: Issue) => setUpdatedIssue({ id, issue: nextIssue });
+  const handleIssueUpdated = (nextIssue: Issue) => {
+    setUpdatedIssue({ id, issue: nextIssue });
+    historyResult.reload();
+  };
   const refreshIssueAfterEvidence = async () => {
     const response = await api<{ issue: Issue }>(`/issues/${encodedId}`);
     handleIssueUpdated(response.issue);
@@ -105,9 +114,36 @@ export default function IssueDetail() {
       <Card>
         <div className="space-y-4">
           <Heading>Comments</Heading>
-          <CommentsSection key={activityRevision} issueId={issue.id} ownerId={issue.owner_id} user={user} />
+          <CommentsSection
+            key={activityRevision}
+            issueId={issue.id}
+            ownerId={issue.owner_id}
+            user={user}
+            onCommentAdded={historyResult.reload}
+          />
         </div>
       </Card>
+      {can(user.role, "audit:read") && (
+        <Card>
+          <div className="space-y-3">
+            <Heading>History</Heading>
+            {historyResult.loading && <Spinner label="Loading history..." />}
+            {historyResult.error && <Alert>{historyResult.error.message}</Alert>}
+            {!historyResult.loading && !historyResult.error && historyResult.data?.entries.length === 0 && (
+              <EmptyState>No history for this issue.</EmptyState>
+            )}
+            {historyResult.data && historyResult.data.entries.length > 0 && (
+              <ol className="space-y-2">
+                {[...historyResult.data.entries].reverse().map((entry) => (
+                  <li key={entry.id}>
+                    {formatDateTime(entry.created_at)} · {entry.actor_name} · {entry.action}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

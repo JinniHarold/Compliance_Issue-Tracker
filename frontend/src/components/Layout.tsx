@@ -49,6 +49,13 @@ export default function Layout() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(0);
+  const [pendingRevision, setPendingRevision] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => setPendingRevision((revision) => revision + 1);
+    window.addEventListener("pending-actions-updated", refresh);
+    return () => window.removeEventListener("pending-actions-updated", refresh);
+  }, []);
 
   // Count of proposals waiting for a decision; refreshed when the user changes page
   useEffect(() => {
@@ -57,7 +64,7 @@ export default function Layout() {
       .then((r) => { if (!cancelled) setPending(r.total); })
       .catch(() => { /* the badge is optional */ });
     return () => { cancelled = true; };
-  }, [location.pathname]);
+  }, [location.pathname, pendingRevision]);
 
   if (!user) return null;
   const items = NAV.filter((i) => !i.roles || i.roles.includes(user.role));
