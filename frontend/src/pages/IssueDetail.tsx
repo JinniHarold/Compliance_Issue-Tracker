@@ -1,27 +1,26 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
-import { Alert, Card, EmptyState, Heading, Spinner, TextContent } from "../components/ui";
+import { Alert, Card, Heading, Spinner, TextContent } from "../components/ui";
+import CommentsSection from "../components/issue/CommentsSection";
+import EditDetails from "../components/issue/EditDetails";
+import EvidenceSection from "../components/issue/EvidenceSection";
+import WorkflowActions from "../components/issue/WorkflowActions";
+import { useAuth } from "../auth/AuthContext";
+import { api } from "../lib/api";
 import { formatDate, formatDateTime } from "../lib/format";
-import type { Evidence, Issue, IssueComment } from "../lib/types";
+import type { Issue } from "../lib/types";
 import { useFetch } from "../lib/useFetch";
 
-function safeEvidenceUrl(reference: string): string | null {
-  try {
-    const url = new URL(reference);
-    return url.protocol === "http:" || url.protocol === "https:" ? reference : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function IssueDetail() {
+  const { user } = useAuth();
   const { id = "" } = useParams();
   const encodedId = encodeURIComponent(id);
   const issueResult = useFetch<{ issue: Issue }>(`/issues/${encodedId}`);
-  const commentsResult = useFetch<{ comments: IssueComment[] }>(`/issues/${encodedId}/comments`);
-  const evidenceResult = useFetch<{ evidence: Evidence[] }>(`/issues/${encodedId}/evidence`);
+  const [updatedIssue, setUpdatedIssue] = useState<{ id: string; issue: Issue } | null>(null);
+  const [activityRevision, setActivityRevision] = useState(0);
 
-  if (issueResult.loading || commentsResult.loading || evidenceResult.loading) {
+  if (issueResult.loading) {
     return <Spinner label="Loading issue..." />;
   }
   if (issueResult.error instanceof Error && "status" in issueResult.error && issueResult.error.status === 404) {
@@ -33,20 +32,22 @@ export default function IssueDetail() {
     );
   }
 
-  const error = issueResult.error ?? commentsResult.error ?? evidenceResult.error;
-  if (error) {
+  if (issueResult.error) {
     return (
       <div className="space-y-4">
         <Link to="/issues">Back to issues</Link>
-        <Alert>{error.message}</Alert>
+        <Alert>{issueResult.error.message}</Alert>
       </div>
     );
   }
-  if (!issueResult.data || !commentsResult.data || !evidenceResult.data) return null;
+  if (!issueResult.data || !user) return null;
 
-  const issue = issueResult.data.issue;
-  const evidence = evidenceResult.data.evidence;
-  const comments = commentsResult.data.comments;
+  const issue = updatedIssue?.id === id ? updatedIssue.issue : issueResult.data.issue;
+  const handleIssueUpdated = (nextIssue: Issue) => setUpdatedIssue({ id, issue: nextIssue });
+  const refreshIssueAfterEvidence = async () => {
+    const response = await api<{ issue: Issue }>(`/issues/${encodedId}`);
+    handleIssueUpdated(response.issue);
+  };
 
   return (
     <div className="space-y-5">
@@ -61,57 +62,51 @@ export default function IssueDetail() {
       </header>
 
       <Card>
-        <Heading>Details</Heading>
-        <dl className="grid gap-3 md:grid-cols-2">
-          <div><dt>Description</dt><dd><TextContent>{issue.description || "—"}</TextContent></dd></div>
-          <div><dt>Owner</dt><dd>{issue.owner_name}</dd></div>
-          <div><dt>Due date</dt><dd>{formatDate(issue.due_date)}</dd></div>
-          <div><dt>Created</dt><dd>{formatDateTime(issue.created_at)}</dd></div>
-          <div><dt>Updated</dt><dd>{formatDateTime(issue.updated_at)}</dd></div>
-          <div><dt>Completed</dt><dd>{issue.completed_at ? formatDateTime(issue.completed_at) : "—"}</dd></div>
-          <div><dt>Evidence count</dt><dd>{issue.evidence_count}</dd></div>
-        </dl>
+        <div className="space-y-4">
+          <Heading>Details</Heading>
+          <dl className="grid gap-3 md:grid-cols-2">
+            <div><dt>Description</dt><dd><TextContent>{issue.description || "—"}</TextContent></dd></div>
+            <div><dt>Owner</dt><dd>{issue.owner_name}</dd></div>
+            <div><dt>Due date</dt><dd>{formatDate(issue.due_date)}</dd></div>
+            <div><dt>Created</dt><dd>{formatDateTime(issue.created_at)}</dd></div>
+            <div><dt>Updated</dt><dd>{formatDateTime(issue.updated_at)}</dd></div>
+            <div><dt>Completed</dt><dd>{issue.completed_at ? formatDateTime(issue.completed_at) : "—"}</dd></div>
+            <div><dt>Evidence count</dt><dd>{issue.evidence_count}</dd></div>
+          </dl>
+          <EditDetails issue={issue} user={user} onIssueUpdated={handleIssueUpdated} />
+        </div>
       </Card>
 
       <Card>
-        <Heading>Evidence</Heading>
-        {evidence.length === 0 ? (
-          <EmptyState>No evidence has been added.</EmptyState>
-        ) : (
-          <ul className="space-y-4">
-            {evidence.map((item) => {
-              const href = safeEvidenceUrl(item.reference);
-              return (
-                <li key={item.id} className="space-y-1">
-                  {href ? (
-                    <a href={href} target="_blank" rel="noopener noreferrer">{item.reference}</a>
-                  ) : (
-                    <span>{item.reference}</span>
-                  )}
-                  {item.note && <p>{item.note}</p>}
-                  <p>Added by {item.uploaded_by_name} on {formatDateTime(item.created_at)}</p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <div className="space-y-4">
+          <Heading>Evidence</Heading>
+          <EvidenceSection
+            issueId={issue.id}
+            ownerId={issue.owner_id}
+            status={issue.status}
+            user={user}
+            onEvidenceAdded={refreshIssueAfterEvidence}
+          />
+        </div>
       </Card>
 
       <Card>
-        <Heading>Comments</Heading>
-        {comments.length === 0 ? (
-          <EmptyState>No comments yet.</EmptyState>
-        ) : (
-          <ol className="space-y-4">
-            {comments.map((comment) => (
-              <li key={comment.id} className="space-y-1">
-                <p>{comment.author_name} ({comment.author_role}) · {comment.kind.replaceAll("_", " ")}</p>
-                <TextContent>{comment.body}</TextContent>
-                <p>{formatDateTime(comment.created_at)}</p>
-              </li>
-            ))}
-          </ol>
-        )}
+        <div className="space-y-4">
+          <Heading>Workflow</Heading>
+          <WorkflowActions
+            issue={issue}
+            user={user}
+            onIssueUpdated={handleIssueUpdated}
+            onActionComplete={() => setActivityRevision((revision) => revision + 1)}
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <div className="space-y-4">
+          <Heading>Comments</Heading>
+          <CommentsSection key={activityRevision} issueId={issue.id} ownerId={issue.owner_id} user={user} />
+        </div>
       </Card>
     </div>
   );
