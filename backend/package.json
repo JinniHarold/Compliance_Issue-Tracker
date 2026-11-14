@@ -14,7 +14,8 @@
     "start": "tsx src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "agent:token": "tsx src/db/agent-token.ts"
+    "agent:token": "tsx src/db/agent-token.ts",
+    "setup:env": "tsx src/db/setup-env.ts"
     
   },
   "keywords": [],
