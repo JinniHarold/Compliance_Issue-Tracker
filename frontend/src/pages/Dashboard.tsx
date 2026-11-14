@@ -1,25 +1,76 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { api } from "../lib/api";
-import type { DashboardData, Severity } from "../lib/types";
+import { useEffect, useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
+import {
+  Alert,
+  Card,
+  CardHint,
+  CardLabel,
+  CardLink,
+  CardMetric,
+  CardTitle,
+  CardValue,
+  DashboardSeverityStat,
+  EmptyState,
+  Heading,
+  RevealLink,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../components/ui";
+import { api } from "../lib/api";
+import { navigateWithReveal } from "../lib/transition";
+import type { DashboardData, Severity } from "../lib/types";
 
 const SEVERITIES: Severity[] = ["critical", "high", "medium", "low"];
-const BAR: Record<Severity, string> = {
-  critical: "bg-red-500",
-  high: "bg-orange-500",
-  medium: "bg-amber-400",
-  low: "bg-slate-400",
-};
 
-// Each card opens the matching filtered view
-function Stat({ label, value, tone, hint, to }: { label: string; value: number; tone: string; hint?: string; to: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  to,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  to: string;
+}) {
+  const navigate = useNavigate();
+
+  function onClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.currentTarget.target === "_blank"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const keyboardActivation = event.detail === 0;
+    navigateWithReveal(navigate, to, keyboardActivation
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : { x: event.clientX, y: event.clientY });
+  }
+
   return (
-    <Link to={to} className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-400">
-      <div className="text-sm text-slate-500">{label}</div>
-      <div className={`mt-1 text-3xl font-semibold ${tone}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
-    </Link>
+    <Card variant="dashboard">
+      <CardLink to={to} onClick={onClick}>
+        <CardLabel>{label}</CardLabel>
+        <CardValue>{value}</CardValue>
+        {hint && <CardHint>{hint}</CardHint>}
+      </CardLink>
+    </Card>
   );
 }
 
@@ -30,88 +81,98 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     api<DashboardData>("/dashboard")
-      .then((d) => { if (!cancelled) setData(d); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load"); });
+      .then((result) => { if (!cancelled) setData(result); })
+      .catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : "Failed to load"); });
     return () => { cancelled = true; };
   }, []);
 
-  if (error) return <p role="alert" className="rounded-md bg-red-50 px-4 py-3 text-red-700">{error}</p>;
-  if (!data) return <p className="text-slate-500">Loading dashboard…</p>;
+  if (error) return <Alert>{error}</Alert>;
+  if (!data) return <Spinner label="Loading dashboard..." />;
 
   const { totals, active_by_severity, overdue_issues, pending_approvals } = data;
-  const maxSeverity = Math.max(1, ...SEVERITIES.map((s) => active_by_severity[s]));
+  const maxSeverity = Math.max(1, ...SEVERITIES.map((severity) => active_by_severity[severity]));
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <Heading level={1}>Dashboard</Heading>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Open" value={totals.active} tone="text-blue-700" hint="Not yet completed" to="/issues" />
-        <Stat label="Overdue" value={totals.overdue} tone="text-red-700" hint="Past due, not completed" to="/issues?overdue=true" />
-        <Stat label="Completed" value={totals.completed} tone="text-green-700" to="/issues?status=completed" />
-        <Stat label="Awaiting approval" value={pending_approvals} tone="text-purple-700" hint="Agent proposals" to="/approvals" />
+      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 md:grid-cols-4">
+        <Stat label="Open" value={totals.active} hint="Not yet completed" to="/issues" />
+        <Stat label="Overdue" value={totals.overdue} hint="Past due, not completed" to="/issues?overdue=true" />
+        <Stat label="Completed" value={totals.completed} to="/issues?status=completed" />
+        <Stat label="Awaiting approval" value={pending_approvals} hint="Agent proposals" to="/approvals" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Open issues by status</h2>
-          <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
-            <div><dt className="text-xs text-slate-500">Not started</dt><dd className="text-xl font-semibold">{totals.open}</dd></div>
-            <div><dt className="text-xs text-slate-500">In progress</dt><dd className="text-xl font-semibold">{totals.in_progress}</dd></div>
-            <div><dt className="text-xs text-slate-500">In review</dt><dd className="text-xl font-semibold">{totals.in_review}</dd></div>
+        <Card variant="dashboard" className="space-y-3 p-4">
+          <CardTitle>Open issues by status</CardTitle>
+          <dl className="grid grid-cols-3 gap-3 text-center">
+            <div><dt>Not started</dt><CardMetric>{totals.open}</CardMetric></div>
+            <div><dt>In progress</dt><CardMetric>{totals.in_progress}</CardMetric></div>
+            <div><dt>In review</dt><CardMetric>{totals.in_review}</CardMetric></div>
           </dl>
-          <p className="mt-3 text-xs text-slate-500">{totals.due_soon} due in the next 7 days</p>
-        </section>
+          <CardHint>{totals.due_soon} due in the next 7 days</CardHint>
+        </Card>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold">Open issues by severity</h2>
-          <ul className="mt-3 space-y-2">
-            {SEVERITIES.map((s) => (
-              <li key={s} className="flex items-center gap-3 text-sm">
-                <span className="w-16 capitalize text-slate-600">{s}</span>
-                <div className="h-3 flex-1 rounded bg-slate-100">
-                  <div className={`h-3 rounded ${BAR[s]}`} style={{ width: `${(active_by_severity[s] / maxSeverity) * 100}%` }} />
-                </div>
-                <span className="w-6 text-right tabular-nums">{active_by_severity[s]}</span>
-              </li>
+        <Card variant="dashboard" className="space-y-3 p-4">
+          <CardTitle>Open issues by severity</CardTitle>
+          <ul className="space-y-2">
+            {SEVERITIES.map((severity) => (
+              <DashboardSeverityStat
+                key={severity}
+                severity={severity}
+                value={active_by_severity[severity]}
+                percentage={(active_by_severity[severity] / maxSeverity) * 100}
+              />
             ))}
           </ul>
-        </section>
+        </Card>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <h2 className="border-b border-slate-200 px-4 py-3 text-sm font-semibold">Needs attention: most urgent overdue issues</h2>
-        {overdue_issues.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-slate-500">Nothing is overdue.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs font-medium text-slate-500">
-                <tr>
-                  <th className="px-4 py-2">Issue</th>
-                  <th className="px-4 py-2">Severity</th>
-                  <th className="px-4 py-2">Status</th>
-                  <th className="px-4 py-2">Owner</th>
-                  <th className="px-4 py-2">Days overdue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {overdue_issues.map((i) => (
-                  <tr key={i.id}>
-                    <td className="px-4 py-2 font-medium">
-                      <Link to={`/issues/${i.id}`} className="text-blue-700 hover:underline">{i.title}</Link>
-                    </td>
-                    <td className="px-4 py-2"><SeverityBadge severity={i.severity} /></td>
-                    <td className="px-4 py-2"><StatusBadge status={i.status} /></td>
-                    <td className="px-4 py-2">{i.owner_name}</td>
-                    <td className="px-4 py-2 tabular-nums">{i.days_overdue}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <Card variant="dashboard" className="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4">
+          <div className="space-y-1">
+            <CardTitle>Needs attention: most urgent overdue issues</CardTitle>
+            <CardHint>Prioritized by how long each issue is overdue.</CardHint>
           </div>
+          <Link to="/issues?overdue=true" className="text-sm font-medium text-primary hover:underline">View all</Link>
+        </div>
+        {overdue_issues.length === 0 ? (
+          <EmptyState>Nothing is overdue.</EmptyState>
+        ) : (
+          <TableContainer>
+            <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Issue</TableHeader>
+                <TableHeader>Severity</TableHeader>
+                <TableHeader>Status</TableHeader>
+                <TableHeader>Owner</TableHeader>
+                <TableHeader>Days overdue</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {overdue_issues.map((issue) => (
+                <TableRow
+                  key={issue.id}
+                  navigateTo={`/issues/${issue.id}`}
+                  ariaLabel={`Open issue: ${issue.title}`}
+                  severityAccent={issue.severity}
+                >
+                  <TableCell label="Issue">
+                    <RevealLink to={`/issues/${issue.id}`} keyboardOrigin="row">{issue.title}</RevealLink>
+                  </TableCell>
+                  <TableCell label="Severity"><SeverityBadge severity={issue.severity} /></TableCell>
+                  <TableCell label="Status"><StatusBadge status={issue.status} /></TableCell>
+                  <TableCell label="Owner">{issue.owner_name}</TableCell>
+                  <TableCell label="Days overdue">{issue.days_overdue} days overdue</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            </Table>
+          </TableContainer>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

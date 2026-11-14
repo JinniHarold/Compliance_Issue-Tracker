@@ -1,14 +1,17 @@
 import { Fragment, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import {
   Alert,
   Button,
   Card,
+  Collapse,
   EmptyState,
+  ExpandToggle,
   Field,
   Heading,
   Pagination,
+  RevealLink,
   Spinner,
   Table,
   TableBody,
@@ -23,6 +26,7 @@ import {
 import { ApiError, api } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { can } from "../lib/permissions";
+import { useConfirm } from "../lib/useConfirm";
 import type { PendingAction, Paged } from "../lib/types";
 import { useFetch } from "../lib/useFetch";
 
@@ -51,6 +55,7 @@ function isActionStatus(value: string | null): value is ActionStatus {
 
 export default function Approvals() {
   const { user } = useAuth();
+  const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
   const statusParam = searchParams.get("status");
   const status = isActionStatus(statusParam) ? statusParam : "pending";
@@ -85,7 +90,12 @@ export default function Approvals() {
     const note = notes[action.id] ?? "";
     setErrors((previous) => ({ ...previous, [action.id]: "" }));
     setFieldErrors((previous) => ({ ...previous, [action.id]: "" }));
-    if (decision === "reject" && !window.confirm("Reject this proposal?")) return;
+    if (decision === "reject" && !(await confirm({
+      title: "Reject proposal",
+      message: "Reject this proposal?",
+      confirmLabel: "Reject",
+      tone: "danger",
+    }))) return;
     setBusyId(action.id);
     try {
       await api(`/pending-actions/${encodeURIComponent(action.id)}/${decision}`, {
@@ -139,25 +149,23 @@ export default function Approvals() {
                       <Fragment key={item.id}>
                       <TableRow>
                         <TableCell>
-                          <button
-                            type="button"
-                            aria-expanded={expandedId === item.id}
-                            onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                          >
-                            {item.issue_title}
-                          </button>
+                          <RevealLink to={`/issues/${item.issue_id}`} keyboardOrigin="row">{item.issue_title}</RevealLink>
                           {" · "}
-                          <Link to={`/issues/${item.issue_id}`}>View issue</Link>
+                          <ExpandToggle
+                            expanded={expandedId === item.id}
+                            controls={`approval-details-desktop-${item.id}`}
+                            onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                          />
                         </TableCell>
                         <TableCell>{ACTION_LABELS[item.action_type]}</TableCell>
                         <TableCell>{item.requested_by_name}</TableCell>
                         <TableCell>{formatDateTime(item.created_at)}</TableCell>
                         <TableCell>{item.status}</TableCell>
                       </TableRow>
-                      {expandedId === item.id && (
-                        <TableRow>
-                          <TableCell>
-                            <div className="space-y-3">
+                      <TableRow>
+                        <TableCell colSpan={5} className="collapse-table-cell">
+                          <Collapse id={`approval-details-desktop-${item.id}`} expanded={expandedId === item.id}>
+                            <div className="space-y-3 py-2">
                               <p><strong>Rationale:</strong> {item.rationale}</p>
                               {item.payload.comment && <p><strong>Comment:</strong> {item.payload.comment}</p>}
                               {item.payload.severity && <p><strong>New severity:</strong> {item.payload.severity}</p>}
@@ -191,9 +199,9 @@ export default function Approvals() {
                                 </div>
                               )}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
                       </Fragment>
                     ))}
                   </TableBody>
@@ -205,19 +213,17 @@ export default function Approvals() {
             {data.pending_actions.map((item) => (
               <Card key={item.id}>
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    aria-expanded={expandedId === item.id}
+                  <RevealLink to={`/issues/${item.issue_id}`}>{item.issue_title}</RevealLink>
+                  <ExpandToggle
+                    expanded={expandedId === item.id}
+                    controls={`approval-details-mobile-${item.id}`}
                     onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                  >
-                    {item.issue_title}
-                  </button>
+                  />
                   <p>{ACTION_LABELS[item.action_type]} · {item.status}</p>
                   <p>Requested by {item.requested_by_name}</p>
                   <p>{formatDateTime(item.created_at)}</p>
-                  <Link to={`/issues/${item.issue_id}`}>View issue</Link>
-                  {expandedId === item.id && (
-                    <div className="space-y-3">
+                  <Collapse id={`approval-details-mobile-${item.id}`} expanded={expandedId === item.id}>
+                    <div className="space-y-3 py-2">
                       <p><strong>Rationale:</strong> {item.rationale}</p>
                       {item.payload.comment && <p><strong>Comment:</strong> {item.payload.comment}</p>}
                       {item.payload.severity && <p><strong>New severity:</strong> {item.payload.severity}</p>}
@@ -247,7 +253,7 @@ export default function Approvals() {
                         </div>
                       )}
                     </div>
-                  )}
+                  </Collapse>
                 </div>
               </Card>
             ))}

@@ -1,12 +1,17 @@
 import { Fragment, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Alert,
+  AuditDetails,
   Card,
+  Collapse,
   EmptyState,
+  ExpandToggle,
   Field,
+  FilterCard,
   Heading,
   Pagination,
+  RevealLink,
   Select,
   Spinner,
   Table,
@@ -81,7 +86,7 @@ export default function AuditLog() {
   return (
     <div className="space-y-5">
       <Heading level={1}>Audit Logs</Heading>
-      <Card>
+      <FilterCard>
         <div className="grid gap-3 md:grid-cols-3">
           <Field id="audit-actor-type" label="Actor type">
             <Select id="audit-actor-type" value={actorType} onChange={(event) => updateFilter("actor_type", event.target.value)}>
@@ -110,7 +115,7 @@ export default function AuditLog() {
             <TextInput id="audit-to" type="date" value={to} onChange={(event) => updateFilter("to", event.target.value)} />
           </Field>
         </div>
-      </Card>
+      </FilterCard>
       {error && <Alert>{error.message}</Alert>}
       {loading ? (
         <Spinner label="Loading audit log..." />
@@ -135,29 +140,31 @@ export default function AuditLog() {
                       <Fragment key={entry.id}>
                       <TableRow>
                         <TableCell>
-                          <button
-                            type="button"
-                            aria-expanded={expandedId === entry.id}
+                          <ExpandToggle
+                            expanded={expandedId === entry.id}
+                            controls={`audit-details-desktop-${entry.id}`}
                             onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                           >
                             {formatDateTime(entry.created_at)}
-                          </button>
+                          </ExpandToggle>
                         </TableCell>
                         <TableCell>{entry.actor_name} ({entry.actor_type})</TableCell>
                         <TableCell>{entry.action}</TableCell>
                         <TableCell>
                           {entry.entity_type === "issue"
-                            ? <Link to={`/issues/${entry.entity_id}`}>{entry.entity_id}</Link>
+                            ? <RevealLink to={`/issues/${entry.entity_id}`} keyboardOrigin="row">{entry.entity_id}</RevealLink>
                             : entry.entity_id}
                         </TableCell>
                       </TableRow>
-                      {expandedId === entry.id && (
-                        <TableRow>
-                          <TableCell>
-                            <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(entry.details, null, 2)}</pre>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                      <TableRow>
+                        <TableCell colSpan={4} className="collapse-table-cell">
+                          <Collapse id={`audit-details-desktop-${entry.id}`} expanded={expandedId === entry.id}>
+                            <div className="py-2">
+                              <AuditDetails>{JSON.stringify(entry.details, null, 2)}</AuditDetails>
+                            </div>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
                       </Fragment>
                     ))}
                   </TableBody>
@@ -169,23 +176,25 @@ export default function AuditLog() {
             {data.entries.map((entry) => (
               <Card key={entry.id}>
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    aria-expanded={expandedId === entry.id}
+                  <ExpandToggle
+                    expanded={expandedId === entry.id}
+                    controls={`audit-details-mobile-${entry.id}`}
                     onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
                   >
                     {formatDateTime(entry.created_at)}
-                  </button>
+                  </ExpandToggle>
                   <p>{entry.actor_name} ({entry.actor_type})</p>
                   <p>{entry.action}</p>
                   <p>
                     {entry.entity_type === "issue"
-                      ? <Link to={`/issues/${entry.entity_id}`}>{entry.entity_id}</Link>
+                      ? <RevealLink to={`/issues/${entry.entity_id}`}>{entry.entity_id}</RevealLink>
                       : entry.entity_id}
                   </p>
-                  {expandedId === entry.id && (
-                    <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(entry.details, null, 2)}</pre>
-                  )}
+                  <Collapse id={`audit-details-mobile-${entry.id}`} expanded={expandedId === entry.id}>
+                    <div className="py-2">
+                      <AuditDetails>{JSON.stringify(entry.details, null, 2)}</AuditDetails>
+                    </div>
+                  </Collapse>
                 </div>
               </Card>
             ))}

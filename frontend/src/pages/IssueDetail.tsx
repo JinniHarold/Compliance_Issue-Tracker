@@ -1,7 +1,22 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
-import { Alert, Card, EmptyState, Heading, Spinner, TextContent } from "../components/ui";
+import {
+  Alert,
+  Article,
+  ArticleHeader,
+  ArticleList,
+  ArticleListItem,
+  ArticleMeta,
+  Card,
+  DetailList,
+  DetailRow,
+  EmptyState,
+  Heading,
+  LinkButton,
+  Spinner,
+  TextContent,
+} from "../components/ui";
 import CommentsSection from "../components/issue/CommentsSection";
 import EditDetails from "../components/issue/EditDetails";
 import EvidenceSection from "../components/issue/EvidenceSection";
@@ -32,7 +47,7 @@ export default function IssueDetail() {
   if (issueResult.error instanceof Error && "status" in issueResult.error && issueResult.error.status === 404) {
     return (
       <div className="space-y-4">
-        <Link to="/issues">Back to issues</Link>
+        <LinkButton to="/issues">Back to issues</LinkButton>
         <p>Issue not found</p>
       </div>
     );
@@ -41,7 +56,7 @@ export default function IssueDetail() {
   if (issueResult.error) {
     return (
       <div className="space-y-4">
-        <Link to="/issues">Back to issues</Link>
+        <LinkButton to="/issues">Back to issues</LinkButton>
         <Alert>{issueResult.error.message}</Alert>
       </div>
     );
@@ -49,6 +64,7 @@ export default function IssueDetail() {
   if (!issueResult.data || !user) return null;
 
   const issue = updatedIssue?.id === id ? updatedIssue.issue : issueResult.data.issue;
+  const isCompleted = issue.status === "completed";
   const handleIssueUpdated = (nextIssue: Issue) => {
     setUpdatedIssue({ id, issue: nextIssue });
     historyResult.reload();
@@ -59,49 +75,68 @@ export default function IssueDetail() {
   };
 
   return (
-    <div className="space-y-5">
-      <Link to="/issues">Back to issues</Link>
-      <header className="space-y-3">
-        <Heading level={1}>{issue.title}</Heading>
-        <div className="flex flex-wrap items-center gap-2">
-          <SeverityBadge severity={issue.severity} />
-          <StatusBadge status={issue.status} />
-          {issue.is_overdue && <span>Overdue</span>}
-        </div>
-      </header>
+    <Article enabled={isCompleted}>
+      <LinkButton to="/issues">Back to issues</LinkButton>
+      {isCompleted ? (
+        <ArticleHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <SeverityBadge severity={issue.severity} />
+            <StatusBadge status={issue.status} />
+          </div>
+          <Heading level={1} variant="article-title">{issue.title}</Heading>
+          <ArticleMeta>
+            Owner: {issue.owner_name} · Completed {issue.completed_at ? formatDateTime(issue.completed_at) : "Not set"}
+            {issue.is_overdue ? " · Overdue" : ""}
+          </ArticleMeta>
+        </ArticleHeader>
+      ) : (
+        <header className="space-y-3">
+          <Heading level={1}>{issue.title}</Heading>
+          <div className="flex flex-wrap items-center gap-2">
+            <SeverityBadge severity={issue.severity} />
+            <StatusBadge status={issue.status} />
+            {issue.is_overdue && <span>Overdue</span>}
+          </div>
+        </header>
+      )}
 
-      <Card>
+      <Card variant={isCompleted ? "article" : "default"}>
         <div className="space-y-4">
-          <Heading>Details</Heading>
-          <dl className="grid gap-3 md:grid-cols-2">
-            <div><dt>Description</dt><dd><TextContent>{issue.description || "—"}</TextContent></dd></div>
-            <div><dt>Owner</dt><dd>{issue.owner_name}</dd></div>
-            <div><dt>Due date</dt><dd>{formatDate(issue.due_date)}</dd></div>
-            <div><dt>Created</dt><dd>{formatDateTime(issue.created_at)}</dd></div>
-            <div><dt>Updated</dt><dd>{formatDateTime(issue.updated_at)}</dd></div>
-            <div><dt>Completed</dt><dd>{issue.completed_at ? formatDateTime(issue.completed_at) : "—"}</dd></div>
-            <div><dt>Evidence count</dt><dd>{issue.evidence_count}</dd></div>
-          </dl>
+          <Heading variant={isCompleted ? "article-section" : "default"}>Details</Heading>
+          <DetailList>
+            <DetailRow label="Description" empty={!issue.description}>
+              {issue.description ? <TextContent>{issue.description}</TextContent> : "Not set"}
+            </DetailRow>
+            <DetailRow label="Owner" empty={!issue.owner_name}>{issue.owner_name || "Not set"}</DetailRow>
+            <DetailRow label="Due date" empty={!issue.due_date}>{issue.due_date ? formatDate(issue.due_date) : "Not set"}</DetailRow>
+            <DetailRow label="Created">{formatDateTime(issue.created_at)}</DetailRow>
+            <DetailRow label="Updated">{formatDateTime(issue.updated_at)}</DetailRow>
+            <DetailRow label="Completed" empty={!issue.completed_at}>
+              {issue.completed_at ? formatDateTime(issue.completed_at) : "Not set"}
+            </DetailRow>
+            <DetailRow label="Evidence count">{issue.evidence_count}</DetailRow>
+          </DetailList>
           <EditDetails issue={issue} user={user} onIssueUpdated={handleIssueUpdated} />
         </div>
       </Card>
 
-      <Card>
+      <Card variant={isCompleted ? "article" : "default"}>
         <div className="space-y-4">
-          <Heading>Evidence</Heading>
+          <Heading variant={isCompleted ? "article-section" : "default"}>Evidence</Heading>
           <EvidenceSection
             issueId={issue.id}
             ownerId={issue.owner_id}
             status={issue.status}
             user={user}
             onEvidenceAdded={refreshIssueAfterEvidence}
+            article={isCompleted}
           />
         </div>
       </Card>
 
-      <Card>
+      <Card variant={isCompleted ? "article" : "default"}>
         <div className="space-y-4">
-          <Heading>Workflow</Heading>
+          <Heading variant={isCompleted ? "article-section" : "default"}>Workflow</Heading>
           <WorkflowActions
             issue={issue}
             user={user}
@@ -111,28 +146,40 @@ export default function IssueDetail() {
         </div>
       </Card>
 
-      <Card>
+      <Card variant={isCompleted ? "article" : "default"}>
         <div className="space-y-4">
-          <Heading>Comments</Heading>
+          <Heading variant={isCompleted ? "article-section" : "default"}>Comments</Heading>
           <CommentsSection
             key={activityRevision}
             issueId={issue.id}
             ownerId={issue.owner_id}
             user={user}
             onCommentAdded={historyResult.reload}
+            article={isCompleted}
           />
         </div>
       </Card>
       {can(user.role, "audit:read") && (
-        <Card>
+        <Card variant={isCompleted ? "article" : "default"}>
           <div className="space-y-3">
-            <Heading>History</Heading>
+            <Heading variant={isCompleted ? "article-section" : "default"}>History</Heading>
             {historyResult.loading && <Spinner label="Loading history..." />}
             {historyResult.error && <Alert>{historyResult.error.message}</Alert>}
             {!historyResult.loading && !historyResult.error && historyResult.data?.entries.length === 0 && (
               <EmptyState>No history for this issue.</EmptyState>
             )}
             {historyResult.data && historyResult.data.entries.length > 0 && (
+              isCompleted ? (
+                <ArticleList ordered>
+                  {[...historyResult.data.entries].reverse().map((entry) => (
+                    <ArticleListItem key={entry.id}>
+                      <ArticleMeta>
+                        {formatDateTime(entry.created_at)} · {entry.actor_name} · {entry.action}
+                      </ArticleMeta>
+                    </ArticleListItem>
+                  ))}
+                </ArticleList>
+              ) : (
               <ol className="space-y-2">
                 {[...historyResult.data.entries].reverse().map((entry) => (
                   <li key={entry.id}>
@@ -140,10 +187,11 @@ export default function IssueDetail() {
                   </li>
                 ))}
               </ol>
+              )
             )}
           </div>
         </Card>
       )}
-    </div>
+    </Article>
   );
 }

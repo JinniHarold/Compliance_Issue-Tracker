@@ -1,5 +1,17 @@
 import { useState, type FormEvent } from "react";
-import { Alert, Button, EmptyState, Field, Spinner, Textarea, TextContent } from "../ui";
+import {
+  Alert,
+  ArticleBody,
+  ArticleList,
+  ArticleListItem,
+  ArticleMeta,
+  Button,
+  EmptyState,
+  Field,
+  Spinner,
+  Textarea,
+  TextContent,
+} from "../ui";
 import { api } from "../../lib/api";
 import type { IssueComment, User } from "../../lib/types";
 import { formatDateTime } from "../../lib/format";
@@ -10,6 +22,7 @@ interface CommentsSectionProps {
   ownerId: string;
   user: User;
   onCommentAdded: () => void;
+  article?: boolean;
 }
 
 const KIND_LABELS: Record<IssueComment["kind"], string> = {
@@ -20,7 +33,13 @@ const KIND_LABELS: Record<IssueComment["kind"], string> = {
   reopened: "Reopened",
 };
 
-export default function CommentsSection({ issueId, ownerId, user, onCommentAdded }: CommentsSectionProps) {
+export default function CommentsSection({
+  issueId,
+  ownerId,
+  user,
+  onCommentAdded,
+  article = false,
+}: CommentsSectionProps) {
   const path = `/issues/${encodeURIComponent(issueId)}/comments`;
   const { data, error, loading, reload } = useFetch<{ comments: IssueComment[] }>(path);
   const canComment = user.role === "admin" || (user.role === "owner" && user.id === ownerId);
@@ -49,7 +68,18 @@ export default function CommentsSection({ issueId, ownerId, user, onCommentAdded
       {loading && <Spinner label="Loading comments..." />}
       {error && <Alert>{error.message}</Alert>}
       {!loading && !error && data && data.comments.length === 0 && <EmptyState>No comments yet.</EmptyState>}
-      {!loading && !error && data && data.comments.length > 0 && (
+      {!loading && !error && data && data.comments.length > 0 && (article ? (
+        <ArticleList thread>
+          {data.comments.map((comment) => (
+            <ArticleListItem key={comment.id}>
+              <ArticleMeta>
+                <strong>{comment.author_name}</strong> ({comment.author_role}) · {KIND_LABELS[comment.kind]} · {formatDateTime(comment.created_at)}
+              </ArticleMeta>
+              <ArticleBody><TextContent>{comment.body}</TextContent></ArticleBody>
+            </ArticleListItem>
+          ))}
+        </ArticleList>
+      ) : (
         <ol className="space-y-4">
           {data.comments.map((comment) => (
             <li key={comment.id} className="space-y-1">
@@ -59,7 +89,7 @@ export default function CommentsSection({ issueId, ownerId, user, onCommentAdded
             </li>
           ))}
         </ol>
-      )}
+      ))}
       {canComment && (
         <form className="space-y-3" onSubmit={submit}>
           {submitError && <Alert>{submitError}</Alert>}

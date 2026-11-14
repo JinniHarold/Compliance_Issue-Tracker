@@ -1,11 +1,43 @@
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "../auth/AuthContext";
+import {
+  AccessDescription,
+  AccessIconBadge,
+  AccessLabel,
+  AccessPage,
+  AuroraBackground,
+  BackToDashboardLink,
+  Card,
+  Heading,
+} from "../components/ui";
 
 export default function NoAccess() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    document.title = "No access";
+    return () => {
+      document.title = "Compliance Tracker";
+    };
+  }, []);
+
   return (
-    <div className="py-16 text-center">
-      <h1 className="text-xl font-semibold">You do not have access to this page</h1>
-      <p className="mt-1 text-sm text-slate-500">Your role cannot open it. Ask an admin if you need access.</p>
-      <Link to="/" className="mt-3 inline-block text-sm text-blue-700 underline">Back to the dashboard</Link>
-    </div>
+    <>
+      <AuroraBackground />
+      <AccessPage>
+        <Card variant="restricted">
+          <div className="space-y-5 text-center">
+            <AccessIconBadge />
+            <AccessLabel>Access restricted</AccessLabel>
+            <Heading level={1} variant="access-title">You do not have access to this page</Heading>
+            <AccessDescription>
+              Your account does not have permission to open this page.
+              {user && ` Signed in as ${user.role}.`}
+            </AccessDescription>
+            <BackToDashboardLink />
+          </div>
+        </Card>
+      </AccessPage>
+    </>
   );
 }

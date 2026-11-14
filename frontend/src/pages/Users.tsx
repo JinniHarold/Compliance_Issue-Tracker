@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  DeactivateButton,
   Dialog,
   EmptyState,
   Field,
@@ -21,6 +22,7 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { ApiError, api } from "../lib/api";
 import { formatDateTime } from "../lib/format";
+import { useConfirm } from "../lib/useConfirm";
 import type { UserRow } from "../lib/types";
 import { useFetch } from "../lib/useFetch";
 
@@ -38,6 +40,7 @@ const EMPTY_USER: NewUser = { email: "", name: "", role: "owner", password: "" }
 
 export default function Users() {
   const { user: currentUser } = useAuth();
+  const confirm = useConfirm();
   const { data, error, loading, reload } = useFetch<{ users: UserRow[] }>("/users");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<NewUser>(EMPTY_USER);
@@ -45,6 +48,7 @@ export default function Users() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function updateRole(target: UserRow, role: ManagedRole) {
@@ -65,13 +69,24 @@ export default function Users() {
 
   async function setActive(target: UserRow, active: boolean) {
     const verb = active ? "Reactivate" : "Deactivate";
-    if (!active && !window.confirm(`Deactivate ${target.name}?`)) return;
+    if (!active && !(await confirm({
+      title: "Deactivate user",
+      message: `Deactivate ${target.name}?`,
+      confirmLabel: "Deactivate",
+      tone: "danger",
+    }))) return;
     setRowErrors((previous) => ({ ...previous, [target.id]: "" }));
     setBusyId(target.id);
+    setSuccessId(null);
     try {
       await api<{ user: UserRow }>(`/users/${encodeURIComponent(target.id)}/${active ? "reactivate" : "deactivate"}`, {
         method: "POST",
       });
+      if (!active) {
+        setSuccessId(target.id);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 1000));
+        setSuccessId(null);
+      }
       reload();
     } catch (reason: unknown) {
       setRowErrors((previous) => ({ ...previous, [target.id]: reason instanceof Error ? reason.message : `Could not ${verb.toLowerCase()} user.` }));
@@ -147,6 +162,7 @@ export default function Users() {
                             row={row}
                             isSelf={row.id === currentUser?.id}
                             busy={busyId === row.id}
+                            success={successId === row.id}
                             error={rowErrors[row.id]}
                             onRoleChange={(role) => updateRole(row, role)}
                             onActiveChange={(active) => setActive(row, active)}
@@ -172,6 +188,7 @@ export default function Users() {
                     row={row}
                     isSelf={row.id === currentUser?.id}
                     busy={busyId === row.id}
+                    success={successId === row.id}
                     error={rowErrors[row.id]}
                     onRoleChange={(role) => updateRole(row, role)}
                     onActiveChange={(active) => setActive(row, active)}
@@ -215,6 +232,7 @@ function UserActions({
   row,
   isSelf,
   busy,
+  success,
   error,
   onRoleChange,
   onActiveChange,
@@ -222,6 +240,7 @@ function UserActions({
   row: UserRow;
   isSelf: boolean;
   busy: boolean;
+  success: boolean;
   error?: string;
   onRoleChange: (role: ManagedRole) => void;
   onActiveChange: (active: boolean) => void;
@@ -229,23 +248,25 @@ function UserActions({
   if (error) return <Alert>{error}</Alert>;
   if (row.role === "agent") return <span>Service account</span>;
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="user-actions-controls">
       {!isSelf && (
-        <Field id={`role-${row.id}`} label="Role">
+        <div className="user-actions-role">
           <Select
             id={`role-${row.id}`}
+            aria-label={`Role for ${row.name}`}
+            className="user-role-select"
             value={row.role}
             disabled={busy}
             onChange={(event) => onRoleChange(event.target.value as ManagedRole)}
           >
             {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
           </Select>
-        </Field>
+        </div>
       )}
       {!isSelf && (
-        <Button variant="secondary" disabled={busy} onClick={() => onActiveChange(!row.is_active)}>
-          {row.is_active ? "Deactivate" : "Reactivate"}
-        </Button>
+        row.is_active
+          ? <DeactivateButton userName={row.name} disabled={busy} success={success} onClick={() => onActiveChange(false)} />
+          : <Button className="user-reactivate-button" variant="secondary" disabled={busy} onClick={() => onActiveChange(true)}>Reactivate</Button>
       )}
     </div>
   );

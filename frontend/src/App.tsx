@@ -3,6 +3,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/RoleRoute";
+import { ConfirmProvider } from "./components/ui";
 import Approvals from "./pages/Approvals";
 import AuditLog from "./pages/AuditLog";
 import Dashboard from "./pages/Dashboard";
@@ -16,24 +17,30 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="issues" element={<Issues />} />
-              <Route path="issues/:id" element={<IssueDetail />} />
-              <Route path="approvals" element={<Approvals />} />
+        <ConfirmProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="issues" element={<Issues />} />
+                <Route path="issues/:id" element={<IssueDetail />} />
+                <Route path="approvals" element={<Approvals />} />
+              </Route>
               <Route element={<RoleRoute roles={["admin"]} />}>
-                <Route path="users" element={<Users />} />
+                <Route element={<Layout />}>
+                  <Route path="users" element={<Users />} />
+                </Route>
               </Route>
               <Route element={<RoleRoute roles={["admin", "auditor"]} />}>
-                <Route path="audit" element={<AuditLog />} />
+                <Route element={<Layout />}>
+                  <Route path="audit" element={<AuditLog />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </ConfirmProvider>
       </BrowserRouter>
     </AuthProvider>
   );

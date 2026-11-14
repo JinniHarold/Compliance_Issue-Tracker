@@ -57,7 +57,9 @@ Statuses: open, in_progress, in_review, completed.
 ## Done means
 `npm run build` passes with no TypeScript errors, and the screen was checked in the browser as admin, owner, and auditor.
 
-## Skeleton phase (current)
+## Skeleton phase
+Its limits on colors, icons, animation, and CSS files are lifted by the Styling phase below. Every other rule here still applies.
+
 Goal: a working, minimally styled skeleton. Every API capability must be reachable from the UI. Styling and animation come later, so do not add colors, animations, icons, or libraries.
 
 - All styling lives in `src/components/ui.tsx` (primitives: Button, TextInput, Textarea, Select, Field, Card, Alert, Spinner, EmptyState, Table wrappers, Dialog, Pagination, Tabs) plus `Badges.tsx`. Pages use these primitives and only layout classes (flex, grid, gap, spacing). No long class strings inside pages, so a restyle means editing ui.tsx.
@@ -69,3 +71,18 @@ Goal: a working, minimally styled skeleton. Every API capability must be reachab
 - Add new response types to `src/lib/types.ts`, matching `api-contract.md` exactly.
 - Role checks: `can()` from `src/lib/permissions.ts` for role-wide rules, plus inline checks like `user.id === issue.owner_id` for per-record rules. Hiding is cosmetic; the API enforces.
 - End every task with: the list of files changed, and 5 manual test steps. `npm run build` must pass.
+
+## Styling phase (current)
+Look: dark by default, light optional. Primary `#883AF9`, secondary white. Font: Inter.
+
+- Theme lives in two places only: `src/index.css` (Tailwind import, CSS variables, font) and `src/components/ui.tsx` + `Badges.tsx` + `Layout.tsx`. This is the one allowed CSS file. Pages never contain colors, fonts, or long class strings, only layout classes (flex, grid, gap, spacing) and the primitives.
+- Semantic tokens as CSS variables, redefined under `[data-theme="light"]`: `--bg`, `--surface`, `--border`, `--text`, `--muted`, `--primary` (#883AF9), `--primary-fg` (white), `--secondary` (white), `--secondary-fg`, `--danger`, `--warn`, `--ok`. Map them in Tailwind (`bg-surface`, `text-muted`, `bg-primary`). Never hardcode hex in components.
+- Dark: near-black navy `--bg`, slightly lighter `--surface`, thin low-contrast borders. Primary button = solid #883AF9 with white text. Secondary button = white background with dark text (dark theme) or white with a border (light theme).
+- Keep contrast readable: tables, forms, and badges use flat surfaces, no glow, gradients, or grid backgrounds. Glow only on the Login page and Dashboard header.
+- Font: `--font-body: var(--font-inter, "Inter"), -apple-system, "Segoe UI", Roboto, Arial, sans-serif;` set on `body`. Load Inter with one `<link>` in `index.html`. Do not add a font package.
+- Theme toggle: one small button in the navbar sets `data-theme` on `<html>` and saves it in `localStorage` ("theme"). Default dark. Set it before first render to avoid a flash.
+- No new libraries, icons, or animations beyond simple `transition-colors`.
+- Badge colors (severity, status, overdue) must be readable in both themes and keep text labels, never color alone.
+- Do not modify `src/lib/api.ts`, `AuthContext`, `ProtectedRoute`, `RoleRoute`, or `backend/`.
+- Restyle tasks: edit only the files listed above. Do not open pages unless a page has inline colors to remove.
+- End with: files changed, and 3 manual checks (dark, light, one table + one form).

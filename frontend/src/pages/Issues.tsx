@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
 import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Dialog,
   EmptyState,
   Field,
+  FilterToggle,
+  FilterCard,
   Heading,
+  Icon,
   Pagination,
   Select,
   Spinner,
@@ -22,6 +26,7 @@ import {
   TableRow,
   TextInput,
   Textarea,
+  RevealLink,
 } from "../components/ui";
 import { ApiError, api } from "../lib/api";
 import { can } from "../lib/permissions";
@@ -78,6 +83,16 @@ export default function Issues() {
     ? (searchParams.get("sort") as SortKey)
     : "due_date";
   const orderValue = searchParams.get("order") === "desc" ? "desc" : "asc";
+  const hasActiveFilters = Boolean(
+    statusValue ||
+    severityValue ||
+    overdueValue ||
+    ownerId ||
+    searchValue ||
+    searchDraft.trim() ||
+    (searchParams.has("sort") && sortValue !== "due_date") ||
+    (searchParams.has("order") && orderValue !== "asc")
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -173,7 +188,7 @@ export default function Issues() {
         {canCreate && <Button onClick={openCreateDialog}>New issue</Button>}
       </div>
 
-      <Card>
+      <FilterCard>
         <div className="grid gap-3 md:grid-cols-3">
           <Field id="filter-status" label="Status">
             <Select id="filter-status" value={statusValue} onChange={(event) => changeFilter("status", event.target.value)}>
@@ -210,24 +225,25 @@ export default function Issues() {
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <label htmlFor="filter-overdue" className="flex items-center gap-2">
-            <input
+            <Checkbox
               id="filter-overdue"
-              type="checkbox"
               checked={overdueValue}
               onChange={(event) => changeFilter("overdue", event.target.checked ? "true" : "")}
             />
             Overdue
           </label>
-          <Button
-            variant="secondary"
-            aria-pressed={ownerId === user?.id}
+          <FilterToggle
+            pressed={ownerId === user?.id}
             onClick={() => changeFilter("owner_id", ownerId === user?.id ? "" : user?.id ?? "")}
           >
             Assigned to me
+          </FilterToggle>
+          <Button variant="ghost-danger" disabled={!hasActiveFilters} onClick={clearFilters}>
+            <Icon name="filter_alt_off" />
+            Clear filters
           </Button>
-          <Button variant="secondary" onClick={clearFilters}>Clear filters</Button>
         </div>
-      </Card>
+      </FilterCard>
 
       {error && <Alert>{error.message}</Alert>}
       {loading ? (
@@ -252,8 +268,12 @@ export default function Issues() {
                   </TableHead>
                   <TableBody>
                     {data.issues.map((issue) => (
-                      <TableRow key={issue.id}>
-                        <TableCell><Link to={`/issues/${issue.id}`}>{issue.title}</Link></TableCell>
+                      <TableRow
+                        key={issue.id}
+                        navigateTo={`/issues/${issue.id}`}
+                        ariaLabel={`Open issue: ${issue.title}`}
+                      >
+                        <TableCell><RevealLink to={`/issues/${issue.id}`} keyboardOrigin="row">{issue.title}</RevealLink></TableCell>
                         <TableCell><SeverityBadge severity={issue.severity} /></TableCell>
                         <TableCell><StatusBadge status={issue.status} /></TableCell>
                         <TableCell>{issue.owner_name}</TableCell>
@@ -273,7 +293,7 @@ export default function Issues() {
             {data.issues.map((issue) => (
               <Card key={issue.id}>
                 <div className="space-y-3">
-                  <Link to={`/issues/${issue.id}`}>{issue.title}</Link>
+                  <RevealLink to={`/issues/${issue.id}`} keyboardOrigin="row">{issue.title}</RevealLink>
                   <div className="flex flex-wrap gap-2">
                     <SeverityBadge severity={issue.severity} />
                     <StatusBadge status={issue.status} />

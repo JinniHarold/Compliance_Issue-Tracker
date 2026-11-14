@@ -1,5 +1,18 @@
 import { useState, type FormEvent } from "react";
-import { Alert, Button, EmptyState, Field, Spinner, TextInput, Textarea } from "../ui";
+import {
+  Alert,
+  ArticleBody,
+  ArticleIconSlot,
+  ArticleList,
+  ArticleListItem,
+  ArticleMeta,
+  Button,
+  EmptyState,
+  Field,
+  Spinner,
+  TextInput,
+  Textarea,
+} from "../ui";
 import { ApiError, api } from "../../lib/api";
 import type { Evidence, Status, User } from "../../lib/types";
 import { formatDateTime } from "../../lib/format";
@@ -11,6 +24,7 @@ interface EvidenceSectionProps {
   status: Status;
   user: User;
   onEvidenceAdded: () => Promise<void>;
+  article?: boolean;
 }
 
 function safeEvidenceUrl(reference: string): string | null {
@@ -22,7 +36,14 @@ function safeEvidenceUrl(reference: string): string | null {
   }
 }
 
-export default function EvidenceSection({ issueId, ownerId, status, user, onEvidenceAdded }: EvidenceSectionProps) {
+export default function EvidenceSection({
+  issueId,
+  ownerId,
+  status,
+  user,
+  onEvidenceAdded,
+  article = false,
+}: EvidenceSectionProps) {
   const path = `/issues/${encodeURIComponent(issueId)}/evidence`;
   const { data, error, loading, reload } = useFetch<{ evidence: Evidence[] }>(path);
   const locked = status === "in_review" || status === "completed";
@@ -59,7 +80,23 @@ export default function EvidenceSection({ issueId, ownerId, status, user, onEvid
       {loading && <Spinner label="Loading evidence..." />}
       {error && <Alert>{error.message}</Alert>}
       {!loading && !error && data && data.evidence.length === 0 && <EmptyState>No evidence has been added.</EmptyState>}
-      {!loading && !error && data && data.evidence.length > 0 && (
+      {!loading && !error && data && data.evidence.length > 0 && (article ? (
+        <ArticleList iconSlots>
+          {data.evidence.map((item) => {
+            const href = safeEvidenceUrl(item.reference);
+            return (
+              <ArticleListItem key={item.id}>
+                <ArticleIconSlot />
+                <div className="article-evidence-content">
+                  {href ? <a href={href} target="_blank" rel="noopener noreferrer">{item.reference}</a> : <span>{item.reference}</span>}
+                  {item.note && <ArticleBody>{item.note}</ArticleBody>}
+                  <ArticleMeta>Added by {item.uploaded_by_name} · {formatDateTime(item.created_at)}</ArticleMeta>
+                </div>
+              </ArticleListItem>
+            );
+          })}
+        </ArticleList>
+      ) : (
         <ul className="space-y-4">
           {data.evidence.map((item) => {
             const href = safeEvidenceUrl(item.reference);
@@ -72,7 +109,7 @@ export default function EvidenceSection({ issueId, ownerId, status, user, onEvid
             );
           })}
         </ul>
-      )}
+      ))}
       {canAdd && (
         <form className="space-y-3" onSubmit={submit}>
           {submitError && <Alert>{submitError}</Alert>}

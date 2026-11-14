@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Alert, Button, Field, Textarea } from "../ui";
 import { ApiError, api } from "../../lib/api";
 import { can } from "../../lib/permissions";
+import { useConfirm } from "../../lib/useConfirm";
 import type { Issue, User } from "../../lib/types";
 
 interface WorkflowActionsProps {
@@ -12,6 +13,7 @@ interface WorkflowActionsProps {
 }
 
 export default function WorkflowActions({ issue, user, onIssueUpdated, onActionComplete }: WorkflowActionsProps) {
+  const confirm = useConfirm();
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldError, setFieldError] = useState<string | undefined>();
@@ -58,7 +60,12 @@ export default function WorkflowActions({ issue, user, onIssueUpdated, onActionC
   }
 
   async function completeIssue() {
-    if (!window.confirm("Complete this issue?")) return;
+    if (!(await confirm({
+      title: "Complete issue",
+      message: "Complete this issue?",
+      confirmLabel: "Complete",
+      tone: "primary",
+    }))) return;
     setError(null);
     setFieldError(undefined);
     setBusy(true);
